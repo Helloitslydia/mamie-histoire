@@ -3,11 +3,6 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
-
 interface Histoire {
   id: string;
   created_at: string;
@@ -23,27 +18,32 @@ export default function Souvenirs() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+
+    const fetchSouvenirs = async () => {
+      try {
+        setIsLoading(true);
+        const { data, error } = await supabase
+          .from('les_histoires')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        setSouvenirs(data || []);
+      } catch (err) {
+        console.error('Erreur lors de la récupération des souvenirs:', err);
+        setError('Impossible de charger les souvenirs');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     fetchSouvenirs();
   }, []);
-
-  const fetchSouvenirs = async () => {
-    try {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .from('les_histoires')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      setSouvenirs(data || []);
-    } catch (err) {
-      console.error('Erreur lors de la récupération des souvenirs:', err);
-      setError('Impossible de charger les souvenirs');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('fr-FR', {

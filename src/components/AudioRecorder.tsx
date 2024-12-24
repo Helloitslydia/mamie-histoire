@@ -10,14 +10,6 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Supabase URL and Anon Key are required');
 }
 
-console.log('Initialisation Supabase avec URL:', supabaseUrl);
-
-const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: false
-  }
-});
-
 export default function AudioRecorder() {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -30,8 +22,15 @@ export default function AudioRecorder() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const supabaseRef = useRef<any>(null);
 
   useEffect(() => {
+    supabaseRef.current = createClient(supabaseUrl, supabaseKey, {
+      auth: {
+        persistSession: false
+      }
+    });
+
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -97,7 +96,7 @@ export default function AudioRecorder() {
   };
 
   const saveRecording = async () => {
-    if (!audioBlob || !title) return;
+    if (!audioBlob || !title || !supabaseRef.current) return;
 
     try {
       setStatus('Enregistrement en cours de sauvegarde...');
@@ -108,19 +107,19 @@ export default function AudioRecorder() {
       const fileName = `${timestamp}_${title.replace(/\s+/g, '_')}.webm`;
 
       // Upload du fichier audio
-      const { data: uploadData, error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await supabaseRef.current.storage
         .from('les_audios_records')
         .upload(fileName, audioBlob);
 
       if (uploadError) throw uploadError;
 
       // Récupérer l'URL publique
-      const { data: { publicUrl } } = supabase.storage
+      const { data: { publicUrl } } = supabaseRef.current.storage
         .from('les_audios_records')
         .getPublicUrl(fileName);
 
       // Sauvegarder les métadonnées dans la base de données
-      const { error: dbError } = await supabase
+      const { error: dbError } = await supabaseRef.current
         .from('les_histoires')
         .insert([
           {
