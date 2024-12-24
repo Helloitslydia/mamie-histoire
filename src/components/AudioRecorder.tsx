@@ -3,13 +3,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  throw new Error('Supabase URL and Anon Key are required');
-}
-
 export default function AudioRecorder() {
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -25,11 +18,24 @@ export default function AudioRecorder() {
   const supabaseRef = useRef<any>(null);
 
   useEffect(() => {
-    supabaseRef.current = createClient(supabaseUrl, supabaseKey, {
-      auth: {
-        persistSession: false
-      }
-    });
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseKey) {
+      setError('Configuration Supabase manquante');
+      return;
+    }
+
+    try {
+      supabaseRef.current = createClient(supabaseUrl, supabaseKey, {
+        auth: {
+          persistSession: false
+        }
+      });
+    } catch (err) {
+      setError('Erreur lors de l\'initialisation de Supabase');
+      console.error('Erreur Supabase:', err);
+    }
 
     return () => {
       if (timerRef.current) {
@@ -96,7 +102,10 @@ export default function AudioRecorder() {
   };
 
   const saveRecording = async () => {
-    if (!audioBlob || !title || !supabaseRef.current) return;
+    if (!audioBlob || !title || !supabaseRef.current) {
+      setError('Impossible de sauvegarder l\'enregistrement. Veuillez réessayer.');
+      return;
+    }
 
     try {
       setStatus('Enregistrement en cours de sauvegarde...');
@@ -114,7 +123,7 @@ export default function AudioRecorder() {
       if (uploadError) throw uploadError;
 
       // Récupérer l'URL publique
-      const { data: { publicUrl } } = supabaseRef.current.storage
+      const { data: { publicUrl } } = await supabaseRef.current.storage
         .from('les_audios_records')
         .getPublicUrl(fileName);
 
